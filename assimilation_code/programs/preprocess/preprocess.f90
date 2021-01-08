@@ -189,13 +189,13 @@ character(len = 256) :: input_obs_kinds_mod_file = &
 character(len = 256) :: output_obs_kind_mod_file = &
                         '../../../assimilation_code/modules/observations/obs_kind_mod.f90'
 
-character(len = 256) :: obs_type_files(max_obs_type_files) = 'null'
-character(len = 256) :: quantity_files(max_quantity_files) = 'null'
+character(len = 256) :: model_files(max_model_files) = 'null'
+character(len = 256) :: input_files(max_quantity_files) = 'null'
 logical              :: overwrite_output = .true.
 
-namelist /preprocess_nml/ input_obs_def_mod_file, input_obs_qty_mod_file,   &
-                          output_obs_def_mod_file, output_obs_qty_mod_file, &
-                          obs_type_files, input_files, overwrite_output
+namelist /preprocess_nml/ input_obs_def_mod_file, input_obs_kind_mod_file,   &
+                          output_obs_def_mod_file, output_obs_kind_mod_file, &
+                          model_files, input_files, overwrite_output
 
 !---------------------------------------------------------------------------
 ! start of program code
@@ -212,24 +212,24 @@ call check_namelist_read(iunit, io, "preprocess_nml")
 ! Output the namelist file information
 call log_it('Path names of default obs_def and obs_qty modules')
 call log_it(input_obs_def_mod_file)
-call log_it(input_obs_qty_mod_file)
+call log_it(input_obs_kind_mod_file)
 
 call log_it('Path names of output obs_def and obs_qty modules')
 call log_it(output_obs_def_mod_file)
-call log_it(output_obs_qty_mod_file)
+call log_it(output_obs_kind_mod_file)
 
 ! The name for the default files is required. Error if these are null.
 call cannot_be_null(input_obs_def_mod_file, 'input_obs_def_mod_file')
-call cannot_be_null(input_obs_qty_mod_file, 'input_obs_qty_mod_file')
+call cannot_be_null(input_obs_kind_mod_file, 'input_obs_kind_mod_file')
 
 call cannot_be_null(output_obs_def_mod_file, 'output_obs_def_mod_file')
-call cannot_be_null(output_obs_qty_mod_file, 'output_obs_qty_mod_file')
+call cannot_be_null(output_obs_kind_mod_file, 'output_obs_kind_mod_file')
 
 call log_it('INPUT obs_def files:')
 
 do i = 1, max_obs_type_files
-   if(obs_type_files(i) == 'null') exit
-   call log_it(obs_type_files(i))
+   if(model_files(i) == 'null') exit
+   call log_it(model_files(i))
    num_obs_type_files= i
 enddo
 
@@ -244,10 +244,10 @@ enddo
 ! Open/Create the DEFAULT and OUTPUT files and set the unit numbers
 
 call open_file_for_read(input_obs_def_mod_file, 'input file ', obs_def_in_unit)
-call open_file_for_read(input_obs_qty_mod_file, 'input file ', obs_qty_in_unit)
+call open_file_for_read(input_obs_kind_mod_file, 'input file ', obs_qty_in_unit)
 
 call open_file_for_write(output_obs_def_mod_file, 'output file ', overwrite_output, obs_def_out_unit)
-call open_file_for_write(output_obs_qty_mod_file, 'output file ', overwrite_output, obs_qty_out_unit)
+call open_file_for_write(output_obs_kind_mod_file, 'output file ', overwrite_output, obs_qty_out_unit)
 
 !______________________________________________________________________________
 ! Preprocessing for the obs_kind module
@@ -255,8 +255,8 @@ call open_file_for_write(output_obs_qty_mod_file, 'output file ', overwrite_outp
 
 ! Copy over lines from obs_qty_template file up to the next insertion point
 linenum1 = 0
-call copy_until(obs_qty_in_unit,   input_obs_qty_mod_file, insert_ints_string, linenum1, &
-                obs_qty_out_unit, output_obs_qty_mod_file, .false.)
+call copy_until(obs_qty_in_unit,   input_obs_kind_mod_file, insert_ints_string, linenum1, &
+                obs_qty_out_unit, output_obs_kind_mod_file, .false.)
 
 num_qtys_found = 0
 
@@ -379,17 +379,17 @@ num_types_found = 0
 
 SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
 
-   call open_file_for_read(obs_type_files(j), 'obs_type_files', in_unit)
+   call open_file_for_read(model_files(j), 'model_files', in_unit)
 
    ! Read until the ! BEGIN QUANTITY LIST is found
    linenum2 = 0
-   call read_until(in_unit, obs_type_files(j), qty_start_string, linenum2)
+   call read_until(in_unit, model_files(j), qty_start_string, linenum2)
 
    ! Subsequent lines contain the type_identifier (same as type_string), and
    ! qty_string separated by commas, and optional usercode flag
    EXTRACT_TYPES: do
       call get_next_line(in_unit, full_line_in, qty_end_string, &
-                         obs_type_files(j), linenum2)
+                         model_files(j), linenum2)
 
       ! Look for the ! END QUANTITY LIST in the current line
       test = adjustl(line)
@@ -400,18 +400,18 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
 
       call parse_line(line, ntokens, token, err_string)
       if (ntokens < 0) &
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
    
       if (ntokens == 0) cycle EXTRACT_TYPES
 
       if (ntokens < 2 .or. ntokens > 3) then
          err_string = 'expected OBS_TYPE  QTY_xxx  [COMMON_CODE]. unable to process.'
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
       endif
 
       if (token(2)(1:4) /= 'QTY_') then
          err_string = 'QTY_xxx not found as second word on line'
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
       endif
 
       ! save results in temp vars for now, so we can check for
@@ -419,20 +419,20 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
       ! expected in quantities)
       if (len_trim(token(1)) > len(temp_type)) then
          write(err_string, *) 'Observation type names are limited to ', MAX_NAME_LEN, ' characters'
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
       endif
       temp_type = trim(token(1))
 
       if (len_trim(token(2)) > len(temp_qty)) then
          write(err_string, *) 'Quantity names are limited to ', MAX_NAME_LEN, ' characters'
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
       endif
       temp_qty = trim(token(2))
 
       if (ntokens == 3) then
          if (token(3) /= 'COMMON_CODE') then
             err_string = 'if third word present on line, it must be COMMON_CODE'
-            call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+            call typeqty_error(err_string, line, model_files(j), linenum2)
          endif
          temp_user = .false.
       else
@@ -452,7 +452,7 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
                 (obs_info(i)%has_usercode) .or. temp_user) then
                err_string = &
                   'Duplicate! This observation type has already been processed with different options'
-               call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+               call typeqty_error(err_string, line, model_files(j), linenum2)
             else ! dup, can safely ignore?
                cycle EXTRACT_TYPES
             endif
@@ -475,7 +475,7 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
       if (.not. qty_found) then
          ! an error to specify a quantity not already defined
          err_string = 'Unrecognized QTY_xxx quantity'
-         call typeqty_error(err_string, line, obs_type_files(j), linenum2)
+         call typeqty_error(err_string, line, model_files(j), linenum2)
       endif
 
    enddo EXTRACT_TYPES
@@ -530,8 +530,8 @@ call write_blank_line(obs_qty_out_unit)
 call write_separator_line(obs_qty_out_unit)
 
 ! Copy over lines up to the next insertion point
-call copy_until(obs_qty_in_unit,   input_obs_qty_mod_file, insert_init_string, linenum1, &
-                obs_qty_out_unit, output_obs_qty_mod_file, .false.)
+call copy_until(obs_qty_in_unit,   input_obs_kind_mod_file, insert_init_string, linenum1, &
+                obs_qty_out_unit, output_obs_kind_mod_file, .false.)
 
 !--
 
@@ -630,13 +630,13 @@ ITEMS: do i = 1, NUM_SECTIONS
          if (i == module_item) then
             call write_separator_line(obs_def_out_unit)
             write(obs_def_out_unit, '(2A)') &
-               '!No module code needed for ', trim(obs_type_files(j))
+               '!No module code needed for ', trim(model_files(j))
             call write_separator_line(obs_def_out_unit)
          endif
          !if (i == use_item) then
          !   call write_separator_line(obs_def_out_unit)
          !   write(obs_def_out_unit, '(2A)') &
-         !      '!No use statements needed for ', trim(obs_type_files(j))
+         !      '!No use statements needed for ', trim(model_files(j))
          !   call write_separator_line(obs_def_out_unit)
          !endif
          cycle
@@ -644,19 +644,19 @@ ITEMS: do i = 1, NUM_SECTIONS
 
       ! Since there might someday be a lot of these, 
       ! open and close them each time needed
-      call open_file_for_read(obs_type_files(j), 'obs_type_files', in_unit)
+      call open_file_for_read(model_files(j), 'model_files', in_unit)
       linenum3 = 0
 
       ! Read until the appropriate ITEM # label is found in the input 
       ! for this obs_type
       t_string = '! BEGIN DART PREPROCESS ' // trim(preprocess_string(i)) 
-      call read_until(in_unit, obs_type_files(j), t_string, linenum3)
+      call read_until(in_unit, model_files(j), t_string, linenum3)
       
       ! decoration or visual separation, depending on your viewpoint
       if (i == module_item) then
          call write_separator_line(obs_def_out_unit)
          write(obs_def_out_unit, '(2A)') '! Start of code inserted from ', &
-            trim(obs_type_files(j))
+            trim(model_files(j))
          call write_separator_line(obs_def_out_unit)
          call write_blank_line(obs_def_out_unit)
       endif
@@ -664,7 +664,7 @@ ITEMS: do i = 1, NUM_SECTIONS
       ! Copy all code until the end of item into the output obs_def file
  
       t_string = '! END DART PREPROCESS ' // trim(preprocess_string(i))
-      call copy_until(in_unit, obs_type_files(j), t_string, linenum3, &
+      call copy_until(in_unit, model_files(j), t_string, linenum3, &
                       obs_def_out_unit, output_obs_def_mod_file, (i /= module_item))
          
 
@@ -673,7 +673,7 @@ ITEMS: do i = 1, NUM_SECTIONS
          call write_blank_line(obs_def_out_unit)
          call write_separator_line(obs_def_out_unit)
          write(obs_def_out_unit, '(2A)') '! End of code inserted from ', &
-            trim(obs_type_files(j))
+            trim(model_files(j))
          call write_separator_line(obs_def_out_unit)
       endif
 
