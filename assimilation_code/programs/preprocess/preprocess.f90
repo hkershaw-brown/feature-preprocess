@@ -20,6 +20,7 @@
 !> type modules. Preprocess also inserts the required identifiers and strings
 !> for the corresponding observation quantities.
 !>
+!> Nancy fixmes:
 !> @todo FIXME: the module name is set by whatever is in the DEFAULT_xxx file
 !> which is still obs_kind_mod instead of _qty_.  also i have changed the default
 !> filenames here to be _qty_ but in reality all the pathnames files for the
