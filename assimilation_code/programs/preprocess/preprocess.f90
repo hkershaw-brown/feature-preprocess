@@ -184,7 +184,6 @@ character(len = 256) :: input_obs_def_mod_file = &
                         '../../../observations/forward_operators/DEFAULT_obs_def_mod.F90'
 character(len = 256) :: output_obs_def_mod_file = &
                         '../../../observations/forward_operators/obs_def_mod.f90'
-
 character(len = 256) :: input_obs_kinds_mod_file = &
                         '../../../assimilation_code/modules/observations/DEFAULT_obs_kind_mod.F90'
 character(len = 256) :: output_obs_kind_mod_file = &
@@ -196,7 +195,7 @@ logical              :: overwrite_output = .true.
 
 namelist /preprocess_nml/ input_obs_def_mod_file, input_obs_qty_mod_file,   &
                           output_obs_def_mod_file, output_obs_qty_mod_file, &
-                          obs_type_files, quantity_files, overwrite_output
+                          obs_type_files, input_files, overwrite_output
 
 !---------------------------------------------------------------------------
 ! start of program code
@@ -237,8 +236,8 @@ enddo
 call log_it('INPUT quantity files:')
 
 do i = 1, max_quantity_files
-   if(quantity_files(i) == 'null') exit
-   call log_it(quantity_files(i))
+   if(input_files(i) == 'null') exit
+   call log_it(input_files(i))
    num_quantity_files = i
 enddo
 
@@ -251,7 +250,7 @@ call open_file_for_write(output_obs_def_mod_file, 'output file ', overwrite_outp
 call open_file_for_write(output_obs_qty_mod_file, 'output file ', overwrite_output, obs_qty_out_unit)
 
 !______________________________________________________________________________
-! Preprocessing for the obs_qty module
+! Preprocessing for the obs_kind module
 ! Read in the quantity table and build index numbers for them. 
 
 ! Copy over lines from obs_qty_template file up to the next insertion point
@@ -272,17 +271,17 @@ num_qtys_found = num_qtys_found + 1
 
 SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
 
-   call open_file_for_read(quantity_files(j), 'quantity_files', in_unit)
+   call open_file_for_read(input_files(j), 'input_files', in_unit)
 
    ! Read until the ! BEGIN QUANTITY LIST marker string is found
    linenum2 = 0
-   call read_until(in_unit, quantity_files(j), qty2_start_string, linenum2)
+   call read_until(in_unit, input_files(j), qty2_start_string, linenum2)
 
    ! Subsequent lines can contain QTY_xxx lines or comments or
    ! the end string.
    DEFINE_QTYS: do
       call get_next_line(in_unit, full_line_in, qty2_end_string, &
-                         quantity_files(j), linenum2)
+                         input_files(j), linenum2)
 
       ! Look for the ! END QTY LIST in the current line
       test = adjustl(line)
@@ -309,28 +308,28 @@ SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
 
       call parse_line(line, ntokens, token, err_string)
       if (ntokens < 0) &
-         call quantity_error(err_string, line, quantity_files(j), linenum2)
+         call quantity_error(err_string, line, input_files(j), linenum2)
    
       if (ntokens == 0) cycle DEFINE_QTYS
 
       if (ntokens > 4 .or. ntokens == 3) then
          err_string = 'expected QTY_xxx units minbound maxbound. unable to process.'
-         call quantity_error(err_string, line, quantity_files(j), linenum2)
+         call quantity_error(err_string, line, input_files(j), linenum2)
       endif
 
       if (ntokens < 2) then
          err_string = 'expected QTY_xxx units. unable to process.'
-         call quantity_error(err_string, line, quantity_files(j), linenum2)
+         call quantity_error(err_string, line, input_files(j), linenum2)
       endif
 
       if (token(1)(1:4) /= 'QTY_') then
          err_string = 'QTY_xxx not found as first word on line'
-         call quantity_error(err_string, line, quantity_files(j), linenum2)
+         call quantity_error(err_string, line, input_files(j), linenum2)
       endif
 
       if (len_trim(token(1)) > MAX_NAME_LEN) then
          write(err_string, *) 'Quantity names are limited to ', MAX_NAME_LEN, ' characters'
-         call quantity_error(err_string, line, quantity_files(j), linenum2)
+         call quantity_error(err_string, line, input_files(j), linenum2)
       endif
 
       ! this loop adds a new quantity to the string array if it's new.
@@ -350,12 +349,12 @@ SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
             call string_to_real(token(3), qty_info(num_qtys_found)%minbound, err_string)
             if (err_string /= '') then
                err_string = trim(err_string) // ' min bounds'
-               call quantity_error(err_string, line, quantity_files(j), linenum2)
+               call quantity_error(err_string, line, input_files(j), linenum2)
             endif
             call string_to_real(token(4), qty_info(num_qtys_found)%maxbound, err_string)
             if (err_string /= '') then
                err_string = trim(err_string) // ' max bounds'
-               call quantity_error(err_string, line, quantity_files(j), linenum2)
+               call quantity_error(err_string, line, input_files(j), linenum2)
             endif
          endif
          num_qtys_found = num_qtys_found + 1
