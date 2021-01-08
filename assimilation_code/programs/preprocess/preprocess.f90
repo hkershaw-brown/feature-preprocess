@@ -184,12 +184,12 @@ character(len = 256) :: input_obs_def_mod_file = &
                         '../../../observations/forward_operators/DEFAULT_obs_def_mod.F90'
 character(len = 256) :: output_obs_def_mod_file = &
                         '../../../observations/forward_operators/obs_def_mod.f90'
-character(len = 256) :: input_obs_kinds_mod_file = &
+character(len = 256) :: input_obs_kind_mod_file = &
                         '../../../assimilation_code/modules/observations/DEFAULT_obs_kind_mod.F90'
 character(len = 256) :: output_obs_kind_mod_file = &
                         '../../../assimilation_code/modules/observations/obs_kind_mod.f90'
 
-character(len = 256) :: model_files(max_model_files) = 'null'
+character(len = 256) :: model_files(max_obs_type_files) = 'null'
 character(len = 256) :: input_files(max_quantity_files) = 'null'
 logical              :: overwrite_output = .true.
 
