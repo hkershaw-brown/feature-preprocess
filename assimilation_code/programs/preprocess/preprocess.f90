@@ -13,12 +13,20 @@
 !> standard F90 that may be required to implement forward observation operators 
 !> for DART. The sections are retrieved from the files by this program and 
 !> inserted into the appropriate blanks in the DEFAULT_obs_def_mod.F90 and 
-!> DEFAULT_obs_qty_mod.F90 templates. 
+!> DEFAULT_obs_kind_mod.F90 templates. 
 !>
-!> The final obs_def_mod.f90 and obs_qty_mod.f90 that are created contain
-!> the default code plus all the code required from the selected observation
-!> type modules. Preprocess also inserts the required identifiers and strings
-!> for the corresponding observation quantities.
+!>  Input to preprocess:
+!>    Observations:
+!>    DEFAULT_obs_def_mod.F90
+!>    obs_def_*.mod.f90        
+!>
+!>    Physical Quantities (also known as KINDS) 
+!>    DEFAULT_obs_kind_mod.F90
+!>    Quanitity files
+!>
+!>  Ouput:
+!>    obs_def_mod.f90
+!>    obs_kind_mod.f90
 !>
 !> Nancy fixmes:
 !> @todo FIXME: the module name is set by whatever is in the DEFAULT_xxx file
@@ -172,19 +180,16 @@ integer, parameter   :: max_obs_type_files = 1000
 integer, parameter   :: max_quantity_files = 1000
 logical :: file_has_usercode(max_obs_type_files) = .false.
 
-! The namelist reads in a sequence of path_names that are absolute or
-! relative to the working directory in which preprocess is being executed
-! and these files are used to fill in observation type/qty details in
-! DEFAULT_obs_def_mod.f90 and DEFAULT_obs_qty_mod.f90.
 character(len = 256) :: input_obs_def_mod_file = &
                         '../../../observations/forward_operators/DEFAULT_obs_def_mod.F90'
 character(len = 256) :: output_obs_def_mod_file = &
                         '../../../observations/forward_operators/obs_def_mod.f90'
-character(len = 256) :: input_obs_qty_mod_file = &
-                        '../../../assimilation_code/modules/observations/DEFAULT_obs_qty_mod.F90'
-!HK this file does not exist
-character(len = 256) :: output_obs_qty_mod_file = &
-                        '../../../assimilation_code/modules/observations/obs_qty_mod.f90'
+
+character(len = 256) :: input_obs_kinds_mod_file = &
+                        '../../../assimilation_code/modules/observations/DEFAULT_obs_kind_mod.F90'
+character(len = 256) :: output_obs_kind_mod_file = &
+                        '../../../assimilation_code/modules/observations/obs_kind_mod.f90'
+
 character(len = 256) :: obs_type_files(max_obs_type_files) = 'null'
 character(len = 256) :: quantity_files(max_quantity_files) = 'null'
 logical              :: overwrite_output = .true.
