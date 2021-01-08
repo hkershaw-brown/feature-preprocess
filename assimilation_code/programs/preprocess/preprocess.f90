@@ -123,8 +123,8 @@ type(obs_info_type) :: obs_info(1:max_types)
 ! specific marker strings
 !                                                             1         2         3         4         5         6
 !                                                    123456789012345678901234567890123456789012345678901234567890
-character(len=*),parameter :: qty_start_string   = '! BEGIN DART PREPROCESS QUANTITY LIST'
-character(len=*),parameter :: qty_end_string     = '! END DART PREPROCESS QUANTITY LIST'
+character(len=*),parameter :: qty_start_string   = '! BEGIN DART PREPROCESS KIND LIST'
+character(len=*),parameter :: qty_end_string     = '! END DART PREPROCESS KIND LIST'
 character(len=*),parameter :: qty2_start_string  = '! BEGIN DART PREPROCESS QUANTITY DEFINITIONS'
 character(len=*),parameter :: qty2_end_string    = '! END DART PREPROCESS QUANTITY DEFINITIONS'
 character(len=*),parameter :: insert_ints_string = '! DART PREPROCESS INTEGER DECLARATIONS INSERTED HERE'
@@ -189,13 +189,13 @@ character(len = 256) :: input_obs_kind_mod_file = &
 character(len = 256) :: output_obs_kind_mod_file = &
                         '../../../assimilation_code/modules/observations/obs_kind_mod.f90'
 
-character(len = 256) :: model_files(max_obs_type_files) = 'null'
-character(len = 256) :: input_files(max_quantity_files) = 'null'
+character(len = 256) :: input_files(max_obs_type_files) = 'null'
+character(len = 256) :: quantity_files(max_quantity_files) = 'null'
 logical              :: overwrite_output = .true.
 
 namelist /preprocess_nml/ input_obs_def_mod_file, input_obs_kind_mod_file,   &
                           output_obs_def_mod_file, output_obs_kind_mod_file, &
-                          model_files, input_files, overwrite_output
+                          input_files, quantity_files, overwrite_output
 
 !---------------------------------------------------------------------------
 ! start of program code
@@ -203,6 +203,16 @@ namelist /preprocess_nml/ input_obs_def_mod_file, input_obs_kind_mod_file,   &
 !Begin by reading the namelist
 call initialize_utilities('preprocess')
 call register_module(source, revision, revdate)
+
+! Default to all quantity files
+
+quantity_files(1) = '../../../assimilation_code/modules/observations/atmosphere_quantities.f90'
+quantity_files(2) = '../../../assimilation_code/modules/observations/chemistry_quantities.f90'
+quantity_files(3) = '../../../assimilation_code/modules/observations/land_quantities.f90'
+quantity_files(4) = '../../../assimilation_code/modules/observations/ocean_quantities.f90'
+quantity_files(5) = '../../../assimilation_code/modules/observations/oned_quantities.f90'
+quantity_files(6) = '../../../assimilation_code/modules/observations/seaice_quantities.f90'
+quantity_files(7) = '../../../assimilation_code/modules/observations/space_quantities.f90'
 
 ! Read the namelist entry
 call find_namelist_in_file("input.nml", "preprocess_nml", iunit)
@@ -228,16 +238,16 @@ call cannot_be_null(output_obs_kind_mod_file, 'output_obs_kind_mod_file')
 call log_it('INPUT obs_def files:')
 
 do i = 1, max_obs_type_files
-   if(model_files(i) == 'null') exit
-   call log_it(model_files(i))
+   if(input_files(i) == 'null') exit
+   call log_it(input_files(i))
    num_obs_type_files= i
 enddo
 
 call log_it('INPUT quantity files:')
 
 do i = 1, max_quantity_files
-   if(input_files(i) == 'null') exit
-   call log_it(input_files(i))
+   if(quantity_files(i) == 'null') exit
+   call log_it(quantity_files(i))
    num_quantity_files = i
 enddo
 
@@ -271,17 +281,17 @@ num_qtys_found = num_qtys_found + 1
 
 SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
 
-   call open_file_for_read(input_files(j), 'input_files', in_unit)
+   call open_file_for_read(quantity_files(j), 'quantity_files', in_unit)
 
    ! Read until the ! BEGIN QUANTITY LIST marker string is found
    linenum2 = 0
-   call read_until(in_unit, input_files(j), qty2_start_string, linenum2)
+   call read_until(in_unit, quantity_files(j), qty2_start_string, linenum2)
 
    ! Subsequent lines can contain QTY_xxx lines or comments or
    ! the end string.
    DEFINE_QTYS: do
       call get_next_line(in_unit, full_line_in, qty2_end_string, &
-                         input_files(j), linenum2)
+                         quantity_files(j), linenum2)
 
       ! Look for the ! END QTY LIST in the current line
       test = adjustl(line)
@@ -308,28 +318,28 @@ SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
 
       call parse_line(line, ntokens, token, err_string)
       if (ntokens < 0) &
-         call quantity_error(err_string, line, input_files(j), linenum2)
+         call quantity_error(err_string, line, quantity_files(j), linenum2)
    
       if (ntokens == 0) cycle DEFINE_QTYS
 
       if (ntokens > 4 .or. ntokens == 3) then
          err_string = 'expected QTY_xxx units minbound maxbound. unable to process.'
-         call quantity_error(err_string, line, input_files(j), linenum2)
+         call quantity_error(err_string, line, quantity_files(j), linenum2)
       endif
 
       if (ntokens < 2) then
          err_string = 'expected QTY_xxx units. unable to process.'
-         call quantity_error(err_string, line, input_files(j), linenum2)
+         call quantity_error(err_string, line, quantity_files(j), linenum2)
       endif
 
       if (token(1)(1:4) /= 'QTY_') then
          err_string = 'QTY_xxx not found as first word on line'
-         call quantity_error(err_string, line, input_files(j), linenum2)
+         call quantity_error(err_string, line, quantity_files(j), linenum2)
       endif
 
       if (len_trim(token(1)) > MAX_NAME_LEN) then
          write(err_string, *) 'Quantity names are limited to ', MAX_NAME_LEN, ' characters'
-         call quantity_error(err_string, line, input_files(j), linenum2)
+         call quantity_error(err_string, line, quantity_files(j), linenum2)
       endif
 
       ! this loop adds a new quantity to the string array if it's new.
@@ -349,12 +359,12 @@ SEARCH_QUANTITY_FILES: do j = 1, num_quantity_files
             call string_to_real(token(3), qty_info(num_qtys_found)%minbound, err_string)
             if (err_string /= '') then
                err_string = trim(err_string) // ' min bounds'
-               call quantity_error(err_string, line, input_files(j), linenum2)
+               call quantity_error(err_string, line, quantity_files(j), linenum2)
             endif
             call string_to_real(token(4), qty_info(num_qtys_found)%maxbound, err_string)
             if (err_string /= '') then
                err_string = trim(err_string) // ' max bounds'
-               call quantity_error(err_string, line, input_files(j), linenum2)
+               call quantity_error(err_string, line, quantity_files(j), linenum2)
             endif
          endif
          num_qtys_found = num_qtys_found + 1
@@ -379,17 +389,17 @@ num_types_found = 0
 
 SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
 
-   call open_file_for_read(model_files(j), 'model_files', in_unit)
+   call open_file_for_read(input_files(j), 'input_files', in_unit)
 
    ! Read until the ! BEGIN QUANTITY LIST is found
    linenum2 = 0
-   call read_until(in_unit, model_files(j), qty_start_string, linenum2)
+   call read_until(in_unit, input_files(j), qty_start_string, linenum2)
 
    ! Subsequent lines contain the type_identifier (same as type_string), and
    ! qty_string separated by commas, and optional usercode flag
    EXTRACT_TYPES: do
       call get_next_line(in_unit, full_line_in, qty_end_string, &
-                         model_files(j), linenum2)
+                         input_files(j), linenum2)
 
       ! Look for the ! END QUANTITY LIST in the current line
       test = adjustl(line)
@@ -400,18 +410,18 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
 
       call parse_line(line, ntokens, token, err_string)
       if (ntokens < 0) &
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
    
       if (ntokens == 0) cycle EXTRACT_TYPES
 
       if (ntokens < 2 .or. ntokens > 3) then
          err_string = 'expected OBS_TYPE  QTY_xxx  [COMMON_CODE]. unable to process.'
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
       endif
 
       if (token(2)(1:4) /= 'QTY_') then
          err_string = 'QTY_xxx not found as second word on line'
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
       endif
 
       ! save results in temp vars for now, so we can check for
@@ -419,20 +429,20 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
       ! expected in quantities)
       if (len_trim(token(1)) > len(temp_type)) then
          write(err_string, *) 'Observation type names are limited to ', MAX_NAME_LEN, ' characters'
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
       endif
       temp_type = trim(token(1))
 
       if (len_trim(token(2)) > len(temp_qty)) then
          write(err_string, *) 'Quantity names are limited to ', MAX_NAME_LEN, ' characters'
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
       endif
       temp_qty = trim(token(2))
 
       if (ntokens == 3) then
          if (token(3) /= 'COMMON_CODE') then
             err_string = 'if third word present on line, it must be COMMON_CODE'
-            call typeqty_error(err_string, line, model_files(j), linenum2)
+            call typeqty_error(err_string, line, input_files(j), linenum2)
          endif
          temp_user = .false.
       else
@@ -452,7 +462,7 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
                 (obs_info(i)%has_usercode) .or. temp_user) then
                err_string = &
                   'Duplicate! This observation type has already been processed with different options'
-               call typeqty_error(err_string, line, model_files(j), linenum2)
+               call typeqty_error(err_string, line, input_files(j), linenum2)
             else ! dup, can safely ignore?
                cycle EXTRACT_TYPES
             endif
@@ -475,7 +485,7 @@ SEARCH_OBS_DEF_FILES: do j = 1, num_obs_type_files
       if (.not. qty_found) then
          ! an error to specify a quantity not already defined
          err_string = 'Unrecognized QTY_xxx quantity'
-         call typeqty_error(err_string, line, model_files(j), linenum2)
+         call typeqty_error(err_string, line, input_files(j), linenum2)
       endif
 
    enddo EXTRACT_TYPES
@@ -630,13 +640,13 @@ ITEMS: do i = 1, NUM_SECTIONS
          if (i == module_item) then
             call write_separator_line(obs_def_out_unit)
             write(obs_def_out_unit, '(2A)') &
-               '!No module code needed for ', trim(model_files(j))
+               '!No module code needed for ', trim(input_files(j))
             call write_separator_line(obs_def_out_unit)
          endif
          !if (i == use_item) then
          !   call write_separator_line(obs_def_out_unit)
          !   write(obs_def_out_unit, '(2A)') &
-         !      '!No use statements needed for ', trim(model_files(j))
+         !      '!No use statements needed for ', trim(input_files(j))
          !   call write_separator_line(obs_def_out_unit)
          !endif
          cycle
@@ -644,19 +654,19 @@ ITEMS: do i = 1, NUM_SECTIONS
 
       ! Since there might someday be a lot of these, 
       ! open and close them each time needed
-      call open_file_for_read(model_files(j), 'model_files', in_unit)
+      call open_file_for_read(input_files(j), 'input_files', in_unit)
       linenum3 = 0
 
       ! Read until the appropriate ITEM # label is found in the input 
       ! for this obs_type
       t_string = '! BEGIN DART PREPROCESS ' // trim(preprocess_string(i)) 
-      call read_until(in_unit, model_files(j), t_string, linenum3)
+      call read_until(in_unit, input_files(j), t_string, linenum3)
       
       ! decoration or visual separation, depending on your viewpoint
       if (i == module_item) then
          call write_separator_line(obs_def_out_unit)
          write(obs_def_out_unit, '(2A)') '! Start of code inserted from ', &
-            trim(model_files(j))
+            trim(input_files(j))
          call write_separator_line(obs_def_out_unit)
          call write_blank_line(obs_def_out_unit)
       endif
@@ -664,7 +674,7 @@ ITEMS: do i = 1, NUM_SECTIONS
       ! Copy all code until the end of item into the output obs_def file
  
       t_string = '! END DART PREPROCESS ' // trim(preprocess_string(i))
-      call copy_until(in_unit, model_files(j), t_string, linenum3, &
+      call copy_until(in_unit, input_files(j), t_string, linenum3, &
                       obs_def_out_unit, output_obs_def_mod_file, (i /= module_item))
          
 
@@ -673,7 +683,7 @@ ITEMS: do i = 1, NUM_SECTIONS
          call write_blank_line(obs_def_out_unit)
          call write_separator_line(obs_def_out_unit)
          write(obs_def_out_unit, '(2A)') '! End of code inserted from ', &
-            trim(model_files(j))
+            trim(input_files(j))
          call write_separator_line(obs_def_out_unit)
       endif
 
